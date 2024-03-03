@@ -51,7 +51,7 @@ for file_path in file_paths:
         continue
     
     # Filter important columns based on file type
-    if 'reviews' in file_name:
+    if 'stats_ratings' in file_name:
         df = df[['Date', 'Package Name', 'Country', 'Daily Average Rating']]
     elif 'sales' in file_name:
         df = df[['Transaction Date', 'Transaction Type', 'Product id', 'Sku Id', 
