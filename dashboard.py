@@ -30,6 +30,44 @@ for file_path in file_paths:
 # We can proceed to create the dashboard using these DataFrames
 # Below is a basic structure for creating a simple Bokeh dashboard
 
+# Preprocces the data : 
+# important columns for sales file : Transaction Date; Transaction Type; Product id; Sku Id; Buyer Country; Buyer Postal Code; Amount (Merchant Currency)
+# important columns for crashes file : Date; Package Name; Daily Crashes; Daily ANRs
+# important columns for retings_country file : Date; Package Name; Country; Daily Average Rating
+
+# Dictionary to store preprocessed DataFrames
+preprocessed_dfs = {}
+
+# Preprocess each file
+for file_path in file_paths:
+    # Extract file name without extension
+    file_name = file_path.split('.')[0]
+    
+    # Read the CSV file into a DataFrame
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"File '{file_path}' not found. Skipping.")
+        continue
+    
+    # Filter important columns based on file type
+    if 'reviews' in file_name:
+        df = df[['Date', 'Package Name', 'Country', 'Daily Average Rating']]
+    elif 'sales' in file_name:
+        df = df[['Transaction Date', 'Transaction Type', 'Product id', 'Sku Id', 
+                 'Buyer Country', 'Buyer Postal Code', 'Amount (Merchant Currency)']]
+    elif 'stats_crashes' in file_name:
+        df = df[['Date', 'Package Name', 'Daily Crashes', 'Daily ANRs']]
+    
+    # Convert date column to datetime format
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'])
+    elif 'Transaction Date' in df.columns:
+        df['Transaction Date'] = pd.to_datetime(df['Transaction Date'])
+    
+    # Store preprocessed DataFrame in dictionary
+    preprocessed_dfs[file_name] = df
+
 # 1. Create Bokeh plots based on the data in 'dfs'
 # For example:
 # sales_plot = figure(title="Sales Volume over Time", x_axis_label="Date", y_axis_label="Sales")
