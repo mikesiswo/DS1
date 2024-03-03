@@ -49,15 +49,40 @@ for file_path in file_paths:
             return None  # Return None if no matching column is found
 
         # Apply conditional preprocessing based on file_name
+        #Preprocess rating country files
         if 'stats_ratings_' in file_name and 'country' in file_name:
             df = df[['date', 'package name', 'country', 'daily average rating', "total average rating"]]
+        #Preprocess sale files
         elif 'sales' in file_name:
             # Find a column that contains "date"
             date_column = find_column_with_substring(df, "date")
             if date_column is None:
                 raise KeyError("date")
-            df = df[[date_column, 'transaction type', 'product id', 'sku id', 
-                    'buyer country', 'buyer postal code', 'amount (merchant currency)']]
+            
+            # Determine the actual transaction column name in the DataFrame
+            transaction_column = next((col for col in ['transaction type', 'financial status'] if col in df.columns), None)
+            if transaction_column is None:
+                raise KeyError("Neither 'transaction type' nor 'financial status' found in index.")
+
+            # Filter rows based on the transaction column
+            df = df[df[transaction_column].isin(['Charge', 'Charged'])]
+            # Filter rows based on the product ID
+            df = df[df['product id'] == 'com.vansteinengroentjes.apps.ddfive']
+            # Filter rows for the specific SKU IDs ('unlockcharactermanager' and 'premium') for the ddfive app
+            valid_skus = ['unlockcharactermanager', 'premium']
+            df = df[df['sku id'].isin(valid_skus)]
+            # Determine the actual column name for buyer country
+            buyer_country_column = next((col for col in ['buyer country', 'country of buyer'] if col in df.columns), None)
+            if buyer_country_column is None:
+                raise KeyError("Neither 'buyer country' nor 'country of buyer' found in index.")
+            # Determine the actual column name for buyer postal code
+            postal_code_column = next((col for col in ['buyer postal code', 'postal code of buyer'] if col in df.columns), None)
+            if postal_code_column is None:
+                raise KeyError("Neither 'buyer postal code' nor 'postal code of buyer' found in index.")
+                
+            df = df[[date_column, transaction_column, 'product id', 'sku id', 
+                buyer_country_column, postal_code_column, 'amount (merchant currency)']]
+        #Preprocess crash files
         elif 'stats_crashes' in file_name:
             df = df[['date', 'package name', 'daily crashes', 'daily anrs']]
 
@@ -81,3 +106,4 @@ print(preprocessed_dfs)
 
 #in welke column komt charged of google fee voor 
 #als et refund moet je row weghalen
+#kijk ook naar charged amount om te weten als en ook naar amount(buyer currency)
