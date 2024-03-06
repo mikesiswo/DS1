@@ -49,10 +49,11 @@ for file_path in file_paths:
             return None  # Return None if no matching column is found
 
         # Apply conditional preprocessing based on file_name
-        #Preprocess rating country files
+        # Preprocess rating country files
         if 'stats_ratings_' in file_name and 'country' in file_name:
             df = df[['date', 'package name', 'country', 'daily average rating', "total average rating"]]
-        #Preprocess sale files
+            
+        # Preprocess sale files
         elif 'sales' in file_name:
             # Find a column that contains "date"
             date_column = find_column_with_substring(df, "date")
@@ -73,21 +74,31 @@ for file_path in file_paths:
             df = df[df['sku id'].isin(valid_skus)]
             # Determine the actual column name for buyer country
             buyer_country_column = next((col for col in ['buyer country', 'country of buyer'] if col in df.columns), None)
+            # KeyError 
             if buyer_country_column is None:
                 raise KeyError("Neither 'buyer country' nor 'country of buyer' found in index.")
             # Determine the actual column name for buyer postal code
             postal_code_column = next((col for col in ['buyer postal code', 'postal code of buyer'] if col in df.columns), None)
+            # KeyError 
             if postal_code_column is None:
                 raise KeyError("Neither 'buyer postal code' nor 'postal code of buyer' found in index.")
-                
+            # Determine the actual column name for amount
+            amount_in_euros = next((col for col in ['amount (merchant currency)', 'charged amount'] if col in df.columns), None)  
+            # if the column is 'charged amount' select only the rows that are in EUR
+            if amount_in_euros is 'charged amount' :
+                df = df[df['currency of sale'].isin (['EUR'])]
+            # KeyError  
+            if amount_in_euros is None:
+                raise KeyError("Neither 'amount (merchant currency)' nor 'charged amount' found in index.")
+            # Cleaned Dataset
             df = df[[date_column, transaction_column, 'product id', 'sku id', 
-                buyer_country_column, postal_code_column, 'amount (merchant currency)']]
-        #Preprocess crash files
+                buyer_country_column, postal_code_column, amount_in_euros]]
+            
+        # Preprocess crash files
         elif 'stats_crashes' in file_name:
             df = df[['date', 'package name', 'daily crashes', 'daily anrs']]
 
         # Store the preprocessed DataFrame in the dictionary
-        # Assuming preprocessed_dfs is a dictionary you've defined earlier
         preprocessed_dfs[file_name] = df
 
     except KeyError as e:
