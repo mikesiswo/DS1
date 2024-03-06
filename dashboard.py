@@ -1,6 +1,21 @@
-import pandas as pd
 import chardet
 import os
+import pandas as pd
+from bokeh.plotting import figure, show, output_file
+from bokeh.io import output_notebook
+from bokeh.models import ColumnDataSource
+from bokeh.transform import dodge
+import numpy as np
+
+
+#Amount(merchant currency) vs Charged amount : 
+#moeten we alleen de euro values van charged amount nemen of alles converten maar dan hoe
+
+#Transaction type vs Financial status : 
+# charged vs google_fee vs google_fee_refund vs Refund. 
+# welke moeten we precies gebruiken, alleen charged van beide columnen ?
+
+#Hoe plaatsen we meerdere figuren op de html file
 
 file_paths = [
     'reviews_202106.csv', 'reviews_202107.csv', 'reviews_202108.csv', 'reviews_202109.csv',
@@ -113,8 +128,67 @@ for file_path in file_paths:
     elif 'transaction date' in df.columns:
         df['transaction date'] = pd.to_datetime(df['transaction date'])
 
-print(preprocessed_dfs)
+# Dictionary to store sums of 'amount (merchant currency)' for each sales file
+# Dictionary to store sums of 'amount (merchant currency)' for each sales file
+amount_sums = {}
 
-#in welke column komt charged of google fee voor 
-#als et refund moet je row weghalen
-#kijk ook naar charged amount om te weten als en ook naar amount(buyer currency)
+# Dictionary to store number of transactions in each sales file
+transactions = {}
+
+# Initialize counter at 6 because we only have data files from the 6th month to 12th
+counter = 6
+
+# Iterate through preprocessed_dfs to calculate sum and count transactions for each sales file
+for file_name, df in preprocessed_dfs.items():
+    if 'sales' in file_name:
+        # Check if 'amount (merchant currency)' column exists in the DataFrame
+        if 'amount (merchant currency)' in df.columns:
+            # Calculate the sum of 'amount (merchant currency)' column
+            amount_sums[f"amount{counter}"] = int(df['amount (merchant currency)'].sum())
+            # Count the number of transactions
+            transactions[f"transactions{counter}"] = len(df)
+            counter += 1
+        # Check if 'charged amount' column exists in the DataFrame
+        elif 'charged amount' in df.columns:
+            # Remove commas from 'charged amount' column and convert to float
+            df['charged amount'] = df['charged amount'].replace(',', '', regex=True).astype(float)
+            # Calculate the sum of 'charged amount' column
+            amount_sums[f"amount{counter}"] = int(df['charged amount'].sum())
+            # Count the number of transactions
+            transactions[f"transactions{counter}"] = len(df)
+            counter += 1
+    
+months = [6,7,8,9,10,11,12]
+
+Amount_EUR = [amount_sums['amount6'],amount_sums['amount7'],amount_sums['amount8'],
+          amount_sums['amount9'],amount_sums['amount10'],amount_sums['amount11'],
+          amount_sums['amount12']]
+
+Transactions = [transactions['transactions6'],transactions['transactions7'],
+                transactions['transactions8'],transactions['transactions9'],
+                transactions['transactions10'],transactions['transactions11'],
+                transactions['transactions12']]
+
+
+# Output the visualization directly in the notebook
+output_file('index.html')
+
+# Create a figure with a datetime type x-axis
+fig = figure(title='Sales Data - Amount(EUR)',
+             height=400, width=700,
+             x_axis_label='Months', y_axis_label='Amount(EUR)',
+             x_minor_ticks=2, y_range=(0, 1500),
+             toolbar_location=None)
+
+fig.vbar(x=months, bottom=0, top=Amount_EUR, 
+         color='blue', width=0.25,legend_label='Amount')
+
+fig.line(x=months, y=Transactions, 
+         color='red', line_width=1, legend_label='Transactions')
+
+
+# Put the legend in the upper left corner
+fig.legend.location = 'top_right'
+
+# Let's check it out
+show(fig)
