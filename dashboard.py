@@ -1,41 +1,19 @@
 import chardet
 import os
 import pandas as pd
+import numpy as np
 from bokeh.plotting import figure, show, output_file
 from bokeh.io import output_notebook
-from bokeh.models import ColumnDataSource
-from bokeh.transform import dodge
-import numpy as np
-from math import pi
-from bokeh.io import show, output_notebook
-from bokeh.models import (AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d)
-import pandas as pd
+from bokeh.transform import dodge,cumsum
+
 from math import pi
 from bokeh.io import show, output_notebook
 from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d
-from bokeh.palettes import Category10
-import pandas as pd
+from bokeh.palettes import Category10,Category20c
 from bokeh.layouts import gridplot
-from math import pi
-from bokeh.palettes import Category20c  # This palette has enough colors for the SKUs and looks beautiful
-from bokeh.transform import cumsum
-from bokeh.plotting import figure, show, output_notebook
-from bokeh.models import ColumnDataSource, HoverTool
-from math import pi
-from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, LabelSet
-from bokeh.transform import cumsum
-import pandas as pd
-from math import pi
-from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, LabelSet
-from bokeh.transform import cumsum
-import pandas as pd
+from bokeh.models import ColumnDataSource, HoverTool, LabelSet
 from math import pi, sin, cos
 
-# Assuming sku_sales_volume is your DataFrame and is already created with 'SKU' and 'SalesVolume'
-
-# Calculate the angle for each SKU based on its sales volume
 
 #Amount(merchant currency) vs Charged amount : 
 #moeten we alleen de euro values van charged amount nemen of alles converten maar dan hoe
@@ -96,7 +74,15 @@ for file_path in file_paths:
         # Preprocess rating country files
         if 'stats_ratings_' in file_name and 'country' in file_name:
             df = df[['date', 'package name', 'country', 'daily average rating', "total average rating"]]
-            
+        
+        # Preprocess rating overview files
+        elif 'stats_ratings_' in file_name and 'overview' in file_name:
+            # Convert 'daily average rating' column to numeric, coercing non-convertible values to NaN
+            df['daily average rating'] = pd.to_numeric(df['daily average rating'], errors='coerce')
+            # Remove rows with NaN values in both columns
+            df = df.dropna(subset=['daily average rating'], how='any')
+            df = df[['date', 'package name', 'daily average rating', "total average rating"]]
+
         # Preprocess sale files
         elif 'sales' in file_name:
             # Find a column that contains "date"
@@ -129,7 +115,7 @@ for file_path in file_paths:
             # Determine the actual column name for amount
             amount_in_euros = next((col for col in ['amount (merchant currency)', 'charged amount'] if col in df.columns), None)  
             # if the column is 'charged amount' select only the rows that are in EUR
-            if amount_in_euros is 'charged amount' :
+            if amount_in_euros == 'charged amount' :
                 df = df[df['currency of sale'].isin (['EUR'])]
             # KeyError  
             if amount_in_euros is None:
@@ -218,6 +204,56 @@ fig.line(x=months, y=Transactions,
 
 # # Put the legend in the upper left corner
 fig.legend.location = 'top_right'
+fig.legend.border_line_color ='black'
+fig.legend.border_line_width = 1
+
+# Initialize lists to store dates, daily crashes, and daily average ratings
+dates = []
+crashes = []
+ratings = []
+
+# Iterate through preprocessed_dfs to extract data
+for file_name, df in preprocessed_dfs.items():
+    if 'rating' in file_name and 'overview' in file_name:
+        if 'daily average rating' in df.columns:
+            # Extract date and daily average rating data
+            rating_data = df[['date', 'daily average rating']]
+            # Store the daily average ratings data
+            ratings.append(rating_data)
+    
+    elif 'crashes' in file_name:
+        if 'daily crashes' in df.columns:
+            # Extract date and daily crashes data
+            crashes_data = df[['date', 'daily crashes']]
+            # Store the daily crashes data
+            crashes.append(crashes_data)
+
+# Merge all crashes and ratings data frames based on the 'date' column
+merged_crashes = pd.concat(crashes)
+merged_ratings = pd.concat(ratings)
+merged_data = pd.merge(merged_crashes, merged_ratings, on='date', how='inner')
+
+# Extract crashes and ratings from the merged data
+crashes = merged_data['daily crashes']
+ratings = merged_data['daily average rating']
+
+# Output the visualization directly in the notebook
+output_file('index.html')
+
+#Define the second figure
+fig2 = figure(width=400, height=400, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
+              background_fill_color="#fafafa")
+fig2.y_range.start = 0
+
+#Change from circle to cross, and set color to red
+fig2.circle(crashes, ratings, size=10, alpha=0.8, color='red', line_color="black", legend_label='Rating based on Crashes')
+
+#Add and configure the legend
+fig2.legend.location = 'bottom_right'
+fig2.legend.border_line_color = 'black'
+fig2.legend.border_line_width = 1
+
+
 
 # Initialize an empty set to store unique countries
 # Function to find column names that include "country"
@@ -299,11 +335,6 @@ plot.add_layout(legend, "center")
 layout = gridplot([[fig], [plot]])
 
 
-
-import pandas as pd
-
-import pandas as pd
-
 valid_skus = ['unlockcharactermanager', 'premium']
 
 # Initialize an empty DataFrame for aggregated sales volume
@@ -344,24 +375,6 @@ for file_name, df in preprocessed_dfs.items():
 # Further aggregate in case of data from multiple files or duplicate SKUs across them
 sku_sales_volume = sku_sales_volume.groupby('SKU')['SalesVolume'].sum().reset_index()
 
-
-
-from math import pi
-from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, LabelSet
-from bokeh.transform import cumsum
-import pandas as pd
-
-# Assuming sku_sales_volume is your DataFrame and is already created with 'SKU' and 'SalesVolume'
-
-# Calculate the angle for each SKU based on its sales volume
-# Calculate the angle for each SKU based on its sales volume
-from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, LabelSet, HoverTool
-import pandas as pd
-import numpy as np
-
-# Assuming sku_sales_volume is a DataFrame that contains the sales volume data
 
 # Calculate total sales and angles for the pie (now donut) chart
 total_sales = sku_sales_volume['SalesVolume'].sum()
@@ -405,16 +418,6 @@ p.legend.background_fill_color = "white"  # Sets the background color of the leg
 p.legend.click_policy = "hide"
 
 
-
-# Show plot
-
-
-
-
-
-
-
-
-
 layout = gridplot([[fig, plot, p]])
+
 show(layout)
