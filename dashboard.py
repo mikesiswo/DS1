@@ -1,16 +1,19 @@
 import chardet
 import os
 import pandas as pd
+import numpy as np
 from bokeh.plotting import figure, show, output_file
 from bokeh.io import output_notebook
-from bokeh.models import ColumnDataSource
-from bokeh.transform import dodge
-import numpy as np
-from sklearn.linear_model import LinearRegression
+from bokeh.transform import dodge,cumsum
+
+from math import pi
+from bokeh.io import show, output_notebook
+from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d
+from bokeh.palettes import Category10,Category20c
 from bokeh.layouts import gridplot
-from bokeh.models import DatetimeAxis,DatetimeTickFormatter
-from bokeh.models import Slope
-from bokeh.palettes import Sunset10
+from bokeh.models import ColumnDataSource, HoverTool, LabelSet
+from math import pi, sin, cos
+
 
 #Amount(merchant currency) vs Charged amount : 
 #moeten we alleen de euro values van charged amount nemen of alles converten maar dan hoe
@@ -185,21 +188,21 @@ Transactions = [transactions['transactions6'],transactions['transactions7'],
 # Output the visualization directly in the notebook
 output_file('index.html')
 
-# Create a figure with a datetime type x-axis
+# # Create a figure with a datetime type x-axis
 fig = figure(title='Sales Data - Amount(EUR)',
-             height=400, width=700,
-             x_axis_label='Months', y_axis_label='Amount(EUR)',
-             x_minor_ticks=2, y_range=(0, 1500),
-             toolbar_location=None)
+              height=400, width=700,
+              x_axis_label='Months', y_axis_label='Amount(EUR)',
+              x_minor_ticks=2, y_range=(0, 1500),
+              toolbar_location=None)
 
 fig.vbar(x=months, bottom=0, top=Amount_EUR, 
-         color='blue', width=0.25,legend_label='Amount')
+          color='blue', width=0.25,legend_label='Amount')
 
 fig.line(x=months, y=Transactions, 
-         color='red', line_width=1, legend_label='Transactions')
+          color='red', line_width=1, legend_label='Transactions')
 
 
-# Put the legend in the upper left corner
+# # Put the legend in the upper left corner
 fig.legend.location = 'top_right'
 fig.legend.border_line_color ='black'
 fig.legend.border_line_width = 1
@@ -237,10 +240,6 @@ ratings = merged_data['daily average rating']
 # Output the visualization directly in the notebook
 output_file('index.html')
 
-
-from bokeh.plotting import figure, show, output_notebook
-from bokeh.layouts import gridplot
-
 #Define the second figure
 fig2 = figure(width=400, height=400, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
               background_fill_color="#fafafa")
@@ -254,8 +253,171 @@ fig2.legend.location = 'bottom_right'
 fig2.legend.border_line_color = 'black'
 fig2.legend.border_line_width = 1
 
-#Assuming 'fig' is another figure you've created, add both to a layout
-layout = gridplot([[fig2]])  # Update with your other figure(s) as needed
 
-#Show the layout
+
+# Initialize an empty set to store unique countries
+# Function to find column names that include "country"
+def find_country_columns(columns):
+    return [col for col in columns if 'country' in col]
+
+# Function to find column name for sales amount
+def find_sales_amount_column(columns):
+    for col_name in ['amount (merchant currency)', 'charged amount']:
+        if col_name in columns:
+            return col_name
+    return None
+
+# Dictionary to store total sales amount by country
+country_sales_totals = {}
+
+for file_name, df in preprocessed_dfs.items():
+    if 'sales' in file_name:
+        # Identify the country column
+        country_columns = find_country_columns(df.columns)
+        if not country_columns:
+            continue  # Skip if no country column found
+        country_column = country_columns[0]  # Use the first matching country column
+        
+        # Identify the sales amount column
+        amount_column = find_sales_amount_column(df.columns)
+        if amount_column is None:
+            continue  # Skip if no sales amount column found
+
+        # Aggregate sales by country
+        for _, row in df.iterrows():
+            country = row[country_column]
+            sale_amount = row[amount_column]
+            if country in country_sales_totals:
+                country_sales_totals[country] += sale_amount
+            else:
+                country_sales_totals[country] = sale_amount
+ # Convert to DataFrame and sort
+df = pd.DataFrame(list(country_sales_totals.items()), columns=['Country', 'Sales']).sort_values(by='Sales', ascending=False)
+
+# Top 9 countries + "Other"
+top_countries = df[:9].copy()
+other_sales_total = df[9:]['Sales'].sum()
+other = pd.DataFrame([["Other", other_sales_total]], columns=['Country', 'Sales'])
+df_combined = pd.concat([top_countries, other], ignore_index=True)
+
+
+
+# Calculate angles
+total_sales = df_combined['Sales'].sum()
+df_combined['Angle'] = df_combined['Sales'] / total_sales * 2 * pi
+
+# Assign colors from Category10 palette
+df_combined['Color'] = Category10[10]  # This palette has exactly 10 unique colors
+
+# Plot setup
+xdr = Range1d(start=-2, end=2)
+ydr = Range1d(start=-2, end=2)
+plot = Plot(x_range=xdr, y_range=ydr, title="Sales by Country (Top 9 + Other)", toolbar_location=None)
+
+angles = df_combined.Angle.cumsum().tolist()
+country_source = ColumnDataSource(dict(
+    start=[0] + angles[:-1],
+    end=angles,
+    colors=df_combined['Color'],
+))
+
+glyph = AnnularWedge(x=0, y=0, inner_radius=1.3, outer_radius=1.8,
+                     start_angle="start", end_angle="end",
+                     line_color="white", line_width=3, fill_color="colors")
+r = plot.add_glyph(country_source, glyph)
+
+legend = Legend(location="center")
+for i, country in enumerate(df_combined['Country']):
+    legend.items.append(LegendItem(label=country, renderers=[r], index=i))
+plot.add_layout(legend, "center")
+
+
+layout = gridplot([[fig], [plot]])
+
+
+valid_skus = ['unlockcharactermanager', 'premium']
+
+# Initialize an empty DataFrame for aggregated sales volume
+sku_sales_volume = pd.DataFrame(columns=['SKU', 'SalesVolume'])
+
+# Function to find column name for sales amount
+def find_sales_amount_column(columns):
+    sales_columns = ['amount (merchant currency)', 'charged amount']
+    found_columns = [col_name for col_name in sales_columns if col_name in columns]
+    return found_columns
+
+for file_name, df in preprocessed_dfs.items():
+    if 'sales' in file_name:
+        # Filter the DataFrame for only those rows where the 'sku id' matches the valid SKUs
+        filtered_df = df[df['sku id'].isin(valid_skus)]
+        
+        # Check if the filtered_df is not empty
+        if not filtered_df.empty:
+            # Identify sales amount column(s)
+            sales_columns = find_sales_amount_column(filtered_df.columns)
+            
+            # Sum the relevant sales amount columns if they exist
+            if len(sales_columns) > 1:
+                # If both columns exist, sum them
+                filtered_df['TotalSales'] = filtered_df[sales_columns[0]] + filtered_df[sales_columns[1]]
+            elif len(sales_columns) == 1:
+                # If only one column exists, use it as is
+                filtered_df['TotalSales'] = filtered_df[sales_columns[0]]
+            else:
+                # If neither column is present, proceed without modifying the DataFrame
+                continue  # Or handle the case as needed
+            
+            # Aggregate sales by SKU
+            agg_sales = filtered_df.groupby('sku id')['TotalSales'].sum().reset_index()
+            agg_sales.columns = ['SKU', 'SalesVolume']
+            sku_sales_volume = pd.concat([sku_sales_volume, agg_sales], ignore_index=True)
+
+# Further aggregate in case of data from multiple files or duplicate SKUs across them
+sku_sales_volume = sku_sales_volume.groupby('SKU')['SalesVolume'].sum().reset_index()
+
+
+# Calculate total sales and angles for the pie (now donut) chart
+total_sales = sku_sales_volume['SalesVolume'].sum()
+sku_sales_volume['angle'] = sku_sales_volume['SalesVolume'] / total_sales * 2 * np.pi
+
+
+
+# Manually assign colors to the SKUs
+sku_color_map = {
+    'unlockcharactermanager': 'blue',  # Example color
+    'premium': 'red'  # Example color
+}
+sku_sales_volume['color'] = sku_sales_volume['SKU'].map(sku_color_map)
+
+# Create a ColumnDataSource for the main chart
+source = ColumnDataSource(sku_sales_volume)
+
+# Create figure
+p = figure(height=500, title="Sales Volume by SKU", toolbar_location=None,
+           tools="", tooltips=None, x_range=(-0.5, 1.0))
+
+# Adjust here for donut plot - Add annular wedges instead of wedges
+p.annular_wedge(x=0.2, y=2, inner_radius=0.3, outer_radius=0.4,
+                start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
+                line_color="white", fill_color='color', legend_field='SKU', source=source)
+
+# Hide axis and grid
+p.axis.axis_label=None
+p.axis.visible=False
+p.grid.grid_line_color = None
+
+p.legend.orientation = "horizontal"
+p.legend.location = "bottom_center"
+p.legend.padding = 10  # Adds padding around the legend
+p.legend.margin = 10  # Adds margin around the legend box
+p.legend.label_text_font_size = '10pt'  # Adjust the font size of the legend text
+p.legend.background_fill_alpha = 0.5  # Adds transparency to the legend background
+p.legend.background_fill_color = "white"  # Sets the background color of the legend
+
+# Optionally, if you want to make the legend interactive to hide the slices when clicked, you can do:
+p.legend.click_policy = "hide"
+
+
+layout = gridplot([[fig, plot, p]])
+
 show(layout)
