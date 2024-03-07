@@ -237,37 +237,25 @@ ratings = merged_data['daily average rating']
 # Output the visualization directly in the notebook
 output_file('index.html')
 
-# linear equation parameters
-slope, intercept = 2, 10
 
-# Generate some random data for demonstration
-# xpts = np.arange(0, 20, 0.2)
-# ypts = slope * xpts + intercept + np.random.normal(0, 4, 100)
+from bokeh.plotting import figure, show, output_notebook
+from bokeh.layouts import gridplot
 
-blue, yellow = Sunset10[0], Sunset10[5]
-
-fig2 = figure(width=600, height=600, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
+#Define the second figure
+fig2 = figure(width=400, height=400, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
               background_fill_color="#fafafa")
 fig2.y_range.start = 0
 
-# Use crashes and ratings data instead of generated data
-fig2.circle(crashes, ratings, size=8, alpha=0.8, fill_color='green', line_color="black", legend_label='Daily Average Ratings')
+#Change from circle to cross, and set color to red
+fig2.circle(crashes, ratings, size=10, alpha=0.8, color='red', line_color="black", legend_label='Rating based on Crashes')
 
-# Calculate the slope based on your data (optional)
-# Here, I'll use a simple linear regression to estimate the slope and intercept
-slope_estimate, intercept_estimate = np.polyfit(crashes, ratings, 1)
+#Add and configure the legend
+fig2.legend.location = 'bottom_right'
+fig2.legend.border_line_color = 'black'
+fig2.legend.border_line_width = 1
 
-# Add a slope line
-slope = Slope(gradient=slope_estimate, y_intercept=intercept_estimate,
-              line_color=blue, line_dash='dashed', line_width=4)
+#Assuming 'fig' is another figure you've created, add both to a layout
+layout = gridplot([[fig2]])  # Update with your other figure(s) as needed
 
-fig2.add_layout(slope)
-
-# Add legend
-fig2.legend.location = 'top_right'
-fig2.legend.border_line_color ='black'
-fig.legend.border_line_width = 1
-
-layout = gridplot([[fig], [fig2]])
-
+#Show the layout
 show(layout)
