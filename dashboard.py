@@ -418,6 +418,6 @@ p.legend.background_fill_color = "white"  # Sets the background color of the leg
 p.legend.click_policy = "hide"
 
 
-layout = gridplot([[fig, plot, p]])
+layout = gridplot([[fig, fig2] ,[plot, p]])
 
 show(layout)
