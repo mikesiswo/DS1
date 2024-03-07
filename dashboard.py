@@ -190,5 +190,39 @@ fig.line(x=months, y=Transactions,
 # Put the legend in the upper left corner
 fig.legend.location = 'top_right'
 
-# Let's check it out
 show(fig)
+
+# Dictionary to store total sum of 'amount (merchant currency)' for each country
+amount_sums_per_country = {}
+
+# Dictionary to store average rating for each country
+average_rating_per_country = {}
+
+# Iterate through preprocessed_dfs to calculate sum and average rating for each country
+for file_name, df in preprocessed_dfs.items():
+    if 'sales' in file_name:
+        # Check if 'amount (merchant currency)' column exists in the DataFrame
+        if 'amount (merchant currency)' in df.columns:
+            # Group by country and calculate the sum of 'amount (merchant currency)' column
+            country_sums = df.groupby(df['buyer country'].fillna(df['buyer country']))['amount (merchant currency)'].sum()
+            # Update the total sum for each country
+            for country, total_sum in country_sums.items():
+                amount_sums_per_country[country] = amount_sums_per_country.get(country, 0) + total_sum
+        # Check if 'charged amount' column exists in the DataFrame
+        elif 'charged amount' in df.columns:
+            # Remove commas from 'charged amount' column and convert to float
+            df['charged amount'] = df['charged amount'].replace(',', '', regex=True).astype(float)
+            # Group by country and calculate the sum of 'charged amount' column
+            country_sums = df.groupby(df['country of buyer'].fillna(df['country of buyer']))['charged amount'].sum()
+            # Update the total sum for each country
+            for country, total_sum in country_sums.items():
+                amount_sums_per_country[country] = amount_sums_per_country.get(country, 0) + total_sum
+    elif 'ratings' in file_name and 'country' in df.columns:
+        # Group by country and calculate the mean of 'total average rating' column
+        country_avg_ratings = df.groupby('country')['total average rating'].mean()
+        # Update the average rating for each country
+        for country, avg_rating in country_avg_ratings.items():
+            average_rating_per_country[country] = avg_rating
+
+
+print(average_rating_per_country)
