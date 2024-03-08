@@ -2,11 +2,14 @@ import chardet
 import os
 import pandas as pd
 from bokeh.plotting import figure, show, output_file
-from bokeh.io import output_notebook
-from bokeh.models import ColumnDataSource
-from bokeh.transform import dodge
 import numpy as np
-
+import geopandas as gpd
+from bokeh.io import output_file
+from bokeh.models import LinearColorMapper, Legend, LegendItem
+from bokeh.plotting import figure,save
+from bokeh.layouts import row
+from bokeh.models import GeoJSONDataSource
+from bokeh.layouts import gridplot
 
 #Amount(merchant currency) vs Charged amount : 
 #moeten we alleen de euro values van charged amount nemen of alles converten maar dan hoe
@@ -129,7 +132,6 @@ for file_path in file_paths:
         df['transaction date'] = pd.to_datetime(df['transaction date'])
 
 # Dictionary to store sums of 'amount (merchant currency)' for each sales file
-# Dictionary to store sums of 'amount (merchant currency)' for each sales file
 amount_sums = {}
 
 # Dictionary to store number of transactions in each sales file
@@ -190,8 +192,6 @@ fig.line(x=months, y=Transactions,
 # Put the legend in the upper left corner
 fig.legend.location = 'top_right'
 
-show(fig)
-
 # Dictionary to store total sum of 'amount (merchant currency)' for each country
 amount_sums_per_country = {}
 
@@ -225,4 +225,65 @@ for file_name, df in preprocessed_dfs.items():
             average_rating_per_country[country] = avg_rating
 
 
-print(average_rating_per_country)
+# Set the SHAPE_RESTORE_SHX option to YES to attempt restoration of .shx file
+os.environ['SHAPE_RESTORE_SHX'] = 'YES'
+
+# Set the path to the shapefile
+world_shapefile_path = 'country_shapes/country_shapes.shp'
+
+# Output the visualization directly in the notebook
+output_file('index.html')
+
+try:
+    # Load the shapefile
+    world = gpd.read_file(world_shapefile_path)
+
+    # Create a figure
+    p_top = figure(title='Top 10 Countries by Total Amount and Average Rating')
+
+    # Convert dictionaries to DataFrames
+    amount_df = pd.DataFrame.from_dict(amount_sums_per_country, orient='index', columns=['total_amount'])
+    rating_df = pd.DataFrame.from_dict(average_rating_per_country, orient='index', columns=['average_rating'])
+
+    # Get top 15 countries for total amount
+    top_amount_countries = amount_df.nlargest(10, 'total_amount')
+
+    # Get ratings for the top 15 countries with the highest total amount
+    top_rating_countries = rating_df.loc[top_amount_countries.index]
+
+    # Merge top amount and rating data with shapefile using ISO2 codes
+    world_merged = world.merge(top_amount_countries, how='inner', left_on='iso_a2', right_index=True)
+    world_merged = world_merged.merge(top_rating_countries, how='inner', left_on='iso_a2', right_index=True)
+
+    # Create GeoJSONDataSource for Bokeh plot
+    world_source = GeoJSONDataSource(geojson=world_merged.to_json())
+
+    # Define a color mapper based on the average rating
+    color_mapper = LinearColorMapper(palette='Viridis256', 
+                    low=top_rating_countries['average_rating'].min(), 
+                    high=top_rating_countries['average_rating'].max())
+
+    # Plot world map with color mapper
+    world_plot = p_top.patches('xs', 'ys', source=world_source, 
+                fill_color={'field': 'average_rating', 'transform': color_mapper}, 
+                line_color='black', line_width=0.5)
+
+    # Create legend
+    legend_items = []
+    for i, (country, row) in enumerate(top_amount_countries.iterrows()):
+        total_amount_int = int(row['total_amount'])  # Convert total amount to integer
+        avg_rating_one_decimal = round(top_rating_countries.loc[country, 'average_rating'], 1)  # Round average rating to 1 decimal place
+        legend_items.append(LegendItem(label=f"{country} (Total Amount: {total_amount_int}, Avg Rating: {avg_rating_one_decimal})", renderers=[world_plot], index=i))
+    legend = Legend(items=legend_items, location='bottom_left')
+    p_top.add_layout(legend)
+
+except Exception as e:
+    print("Error occurred:", e)
+    
+
+# Create a layout grid with both figures and their legends
+layout = gridplot([[fig], [p_top]])
+
+# Save the layout to the HTML file
+output_file('index.html')
+save(layout)
