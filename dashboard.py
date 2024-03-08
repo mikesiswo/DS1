@@ -2,18 +2,17 @@ import chardet
 import os
 import pandas as pd
 import numpy as np
-from bokeh.plotting import figure, show, output_file
-from bokeh.io import output_notebook
+from bokeh.plotting import figure, save, show, output_file
 from bokeh.transform import dodge,cumsum
-
 from math import pi
-from bokeh.io import show, output_notebook
-from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d
+from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d,LinearColorMapper
 from bokeh.palettes import Category10,Category20c
 from bokeh.layouts import gridplot
 from bokeh.models import ColumnDataSource, HoverTool, LabelSet
 from math import pi, sin, cos
-
+import geopandas as gpd
+from bokeh.layouts import row
+from bokeh.models import GeoJSONDataSource
 
 #Amount(merchant currency) vs Charged amount : 
 #moeten we alleen de euro values van charged amount nemen of alles converten maar dan hoe
@@ -144,7 +143,6 @@ for file_path in file_paths:
         df['transaction date'] = pd.to_datetime(df['transaction date'])
 
 # Dictionary to store sums of 'amount (merchant currency)' for each sales file
-# Dictionary to store sums of 'amount (merchant currency)' for each sales file
 amount_sums = {}
 
 # Dictionary to store number of transactions in each sales file
@@ -237,8 +235,48 @@ merged_data = pd.merge(merged_crashes, merged_ratings, on='date', how='inner')
 crashes = merged_data['daily crashes']
 ratings = merged_data['daily average rating']
 
+# Dictionary to store total sum of 'amount (merchant currency)' for each country
+amount_sums_per_country = {}
+
+# Dictionary to store average rating for each country
+average_rating_per_country = {}
+
+# Iterate through preprocessed_dfs to calculate sum and average rating for each country
+for file_name, df in preprocessed_dfs.items():
+    if 'sales' in file_name:
+        # Check if 'amount (merchant currency)' column exists in the DataFrame
+        if 'amount (merchant currency)' in df.columns:
+            # Group by country and calculate the sum of 'amount (merchant currency)' column
+            country_sums = df.groupby(df['buyer country'].fillna(df['buyer country']))['amount (merchant currency)'].sum()
+            # Update the total sum for each country
+            for country, total_sum in country_sums.items():
+                amount_sums_per_country[country] = amount_sums_per_country.get(country, 0) + total_sum
+        # Check if 'charged amount' column exists in the DataFrame
+        elif 'charged amount' in df.columns:
+            # Remove commas from 'charged amount' column and convert to float
+            df['charged amount'] = df['charged amount'].replace(',', '', regex=True).astype(float)
+            # Group by country and calculate the sum of 'charged amount' column
+            country_sums = df.groupby(df['country of buyer'].fillna(df['country of buyer']))['charged amount'].sum()
+            # Update the total sum for each country
+            for country, total_sum in country_sums.items():
+                amount_sums_per_country[country] = amount_sums_per_country.get(country, 0) + total_sum
+    elif 'ratings' in file_name and 'country' in df.columns:
+        # Group by country and calculate the mean of 'total average rating' column
+        country_avg_ratings = df.groupby('country')['total average rating'].mean()
+        # Update the average rating for each country
+        for country, avg_rating in country_avg_ratings.items():
+            average_rating_per_country[country] = avg_rating
+
+
+# Set the SHAPE_RESTORE_SHX option to YES to attempt restoration of .shx file
+os.environ['SHAPE_RESTORE_SHX'] = 'YES'
+
+# Set the path to the shapefile
+world_shapefile_path = 'country_shapes/country_shapes.shp'
+
 # Output the visualization directly in the notebook
 output_file('index.html')
+
 
 #Define the second figure
 fig2 = figure(width=400, height=400, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
@@ -417,7 +455,56 @@ p.legend.background_fill_color = "white"  # Sets the background color of the leg
 # Optionally, if you want to make the legend interactive to hide the slices when clicked, you can do:
 p.legend.click_policy = "hide"
 
+try:
+    # Load the shapefile
+    world = gpd.read_file(world_shapefile_path)
 
-layout = gridplot([[fig, fig2] ,[plot, p]])
+    # Create a figure
+    p_top = figure(title='Top 10 Countries by Total Amount and Average Rating')
 
-show(layout)
+    # Convert dictionaries to DataFrames
+    amount_df = pd.DataFrame.from_dict(amount_sums_per_country, orient='index', columns=['total_amount'])
+    rating_df = pd.DataFrame.from_dict(average_rating_per_country, orient='index', columns=['average_rating'])
+
+    # Get top 15 countries for total amount
+    top_amount_countries = amount_df.nlargest(10, 'total_amount')
+
+    # Get ratings for the top 15 countries with the highest total amount
+    top_rating_countries = rating_df.loc[top_amount_countries.index]
+
+    # Merge top amount and rating data with shapefile using ISO2 codes
+    world_merged = world.merge(top_amount_countries, how='inner', left_on='iso_a2', right_index=True)
+    world_merged = world_merged.merge(top_rating_countries, how='inner', left_on='iso_a2', right_index=True)
+
+    # Create GeoJSONDataSource for Bokeh plot
+    world_source = GeoJSONDataSource(geojson=world_merged.to_json())
+
+    # Define a color mapper based on the average rating
+    color_mapper = LinearColorMapper(palette='Viridis256', 
+                    low=top_rating_countries['average_rating'].min(), 
+                    high=top_rating_countries['average_rating'].max())
+
+    # Plot world map with color mapper
+    world_plot = p_top.patches('xs', 'ys', source=world_source, 
+                fill_color={'field': 'average_rating', 'transform': color_mapper}, 
+                line_color='black', line_width=0.5)
+
+    # Create legend
+    legend_items = []
+    for i, (country, row) in enumerate(top_amount_countries.iterrows()):
+        total_amount_int = int(row['total_amount'])  # Convert total amount to integer
+        avg_rating_one_decimal = round(top_rating_countries.loc[country, 'average_rating'], 1)  # Round average rating to 1 decimal place
+        legend_items.append(LegendItem(label=f"{country} (Total Amount: {total_amount_int}, Avg Rating: {avg_rating_one_decimal})", renderers=[world_plot], index=i))
+    legend = Legend(items=legend_items, location='bottom_left')
+    p_top.add_layout(legend)
+
+except Exception as e:
+    print("Error occurred:", e)
+    
+
+# Create a layout grid with both figures and their legends
+layout = gridplot([[fig, fig2] ,[plot, p], [p_top]])
+
+# Save the layout to the HTML file
+output_file('index.html')
+save(layout)
