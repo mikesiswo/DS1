@@ -5,7 +5,9 @@ import numpy as np
 from bokeh.plotting import figure, save, show, output_file
 from bokeh.transform import dodge,cumsum
 from math import pi
-from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d,LinearColorMapper
+from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d,Plot, Range1d, ColumnDataSource, AnnularWedge, Legend, LegendItem, Label, LabelSet, LinearColorMapper
+# Other imports remain the same
+
 from bokeh.palettes import Category10,Category20c
 from bokeh.layouts import gridplot
 from bokeh.models import ColumnDataSource, HoverTool, LabelSet
@@ -200,33 +202,28 @@ fig.legend.border_line_width = 1
 
 # Initialize an empty set to store unique countries
 # Function to find column names that include "country"
+country_sales_totals = {}
+
 def find_country_columns(columns):
     return [col for col in columns if 'country' in col]
 
-# Function to find column name for sales amount
 def find_sales_amount_column(columns):
     for col_name in ['amount (merchant currency)', 'charged amount']:
         if col_name in columns:
             return col_name
     return None
 
-# Dictionary to store total sales amount by country
-country_sales_totals = {}
-
 for file_name, df in preprocessed_dfs.items():
     if 'sales' in file_name:
-        # Identify the country column
         country_columns = find_country_columns(df.columns)
         if not country_columns:
-            continue  # Skip if no country column found
-        country_column = country_columns[0]  # Use the first matching country column
+            continue
+        country_column = country_columns[0]
         
-        # Identify the sales amount column
         amount_column = find_sales_amount_column(df.columns)
         if amount_column is None:
-            continue  # Skip if no sales amount column found
+            continue
 
-        # Aggregate sales by country
         for _, row in df.iterrows():
             country = row[country_column]
             sale_amount = row[amount_column]
@@ -234,43 +231,52 @@ for file_name, df in preprocessed_dfs.items():
                 country_sales_totals[country] += sale_amount
             else:
                 country_sales_totals[country] = sale_amount
- # Convert to DataFrame and sort
+
+# Convert to DataFrame and sort
 df = pd.DataFrame(list(country_sales_totals.items()), columns=['Country', 'Sales']).sort_values(by='Sales', ascending=False)
 
 # Top 9 countries + "Other"
 top_countries = df[:9].copy()
 other_sales_total = df[9:]['Sales'].sum()
-other = pd.DataFrame([["Other", other_sales_total]], columns=['Country', 'Sales'])
-df_combined = pd.concat([top_countries, other], ignore_index=True)
+df_combined = pd.concat([top_countries, pd.DataFrame([["Other", other_sales_total]], columns=['Country', 'Sales'])], ignore_index=True)
 
 # Calculate angles
 total_sales = df_combined['Sales'].sum()
 df_combined['Angle'] = df_combined['Sales'] / total_sales * 2 * pi
 
-# Assign colors from Category10 palette
-df_combined['Color'] = Category10[10]  # This palette has exactly 10 unique colors
-
 # Plot setup
 xdr = Range1d(start=-2, end=2)
 ydr = Range1d(start=-2, end=2)
-plot = Plot(x_range=xdr, y_range=ydr, title="Sales by Country (Top 9 + Other)", toolbar_location=None)
+plot = Plot(x_range=xdr, y_range=ydr, title="Sales by Country (Top 9 + Other)", toolbar_location=None, width=800, height=600)
 
-angles = df_combined.Angle.cumsum().tolist()
+angles = df_combined['Angle'].cumsum().tolist()
 country_source = ColumnDataSource(dict(
     start=[0] + angles[:-1],
     end=angles,
-    colors=df_combined['Color'],
+    color=Category10[10][:len(df_combined)],  # Ensure this matches with 'fill_color' in the glyph
+    country=df_combined['Country'],
 ))
 
-glyph = AnnularWedge(x=0, y=0, inner_radius=1.3, outer_radius=1.8,
-                     start_angle="start", end_angle="end",
-                     line_color="white", line_width=3, fill_color="colors")
-r = plot.add_glyph(country_source, glyph)
+glyph = AnnularWedge(x=0, y=0, inner_radius=0.8, outer_radius=1.5,
+                     start_angle='start', end_angle='end', 
+                     fill_color='color', line_color="white", line_width=3)
+plot.add_glyph(country_source, glyph)
 
-legend = Legend(location="center")
-for i, country in enumerate(df_combined['Country']):
-    legend.items.append(LegendItem(label=country, renderers=[r], index=i))
-plot.add_layout(legend, "center")
+
+# Create the glyph and add it to the plot, capturing the renderer
+renderer = plot.add_glyph(country_source, glyph)
+
+# Use the renderer for the legend item
+legend_item = LegendItem(label=dict(field='country'), renderers=[renderer])
+
+# Create and add the legend to the plot
+legend = Legend(items=[legend_item], location=(0, 0))
+plot.add_layout(legend, 'right')
+
+
+# Display total sales in the middle
+label = Label(x=0, y=0, text=f'EUR {total_sales:,.2f}', text_font_size="14pt", text_baseline="middle", text_align="center")
+plot.add_layout(label)
 
 valid_skus = ['unlockcharactermanager', 'premium']
 
@@ -497,4 +503,5 @@ layout = gridplot([[fig, fig3] ,[plot, p], [p_top]])
 
 # Save the layout to the HTML file
 output_file('index.html')
+show(layout)
 save(layout)
