@@ -5,7 +5,7 @@ import numpy as np
 from bokeh.plotting import figure, save, show, output_file
 from bokeh.transform import dodge,cumsum
 from math import pi
-from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d,Plot, Range1d, ColumnDataSource, AnnularWedge, Legend, LegendItem, Label, LabelSet, LinearColorMapper
+from bokeh.models import AnnularWedge, ColumnDataSource, Legend, LegendItem, Plot, Range1d,Plot, Range1d, ColumnDataSource, AnnularWedge, Legend, LegendItem, Label, LabelSet, LinearColorMapper,Spacer
 # Other imports remain the same
 
 from bokeh.palettes import Category10,Category20c
@@ -395,15 +395,28 @@ ratings = merged_data['daily average rating']
 #Define the second figure
 fig3 = figure(width=400, height=400, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
               background_fill_color="#fafafa")
+
+# Remove ticks on the x-axis
+fig3.xaxis.major_tick_line_color = None
+fig3.xaxis.minor_tick_line_color = None
+
+# Remove ticks on the y-axis
+fig3.yaxis.major_tick_line_color = None
+fig3.yaxis.minor_tick_line_color = None
+
 fig3.y_range.start = 0
 
 #Change from circle to cross, and set color to red
 fig3.circle(crashes, ratings, size=10, alpha=0.8, color='red', line_color="black", legend_label='Rating based on Crashes')
 
-#Add and configure the legend
-fig3.legend.location = 'bottom_right'
-fig3.legend.border_line_color = 'black'
-fig3.legend.border_line_width = 1
+# Do not display the legend in the figure
+fig3.legend.visible = False
+# change just some things about the x-grid
+fig3.xgrid.grid_line_color = None
+
+# change just some things about the y-grid
+fig3.ygrid.band_fill_alpha = 0.3
+fig3.ygrid.band_fill_color = "cyan"
 
 # TASK 4 - GEOGRAPHICAL DEVELOPMENT 
 
@@ -441,7 +454,7 @@ for file_name, df in preprocessed_dfs.items():
 
 
 # Set the SHAPE_RESTORE_SHX option to YES to attempt restoration of .shx file
-os.environ['SHAPE_RESTORE_SHX'] = 'YES'
+#os.environ['SHAPE_RESTORE_SHX'] = 'YES'
 
 # Set the path to the shapefile
 world_shapefile_path = 'country_shapes/country_shapes.shp'
@@ -451,13 +464,16 @@ try:
     world = gpd.read_file(world_shapefile_path)
 
     # Create a figure
-    p_top = figure(title='Top 10 Countries by Total Amount and Average Rating', tools="pan,wheel_zoom,box_zoom,reset,save")
-    
+    p_top = figure(title='Top 10 Countries by Total Amount and Average Rating', tools="pan,wheel_zoom,box_zoom,reset,save", width=1000, height=600,x_axis_location=None, y_axis_location=None)
+    # Add a border around the figure
+    p_top.outline_line_color = 'black'
+    p_top.outline_line_width = 1
+
     # Convert dictionaries to DataFrames
     amount_df = pd.DataFrame.from_dict(amount_sums_per_country, orient='index', columns=['total_amount'])
     rating_df = pd.DataFrame.from_dict(average_rating_per_country, orient='index', columns=['average_rating'])
 
-    # Get top 15 countries for total amount
+    # Get top 10 countries for total amount
     top_amount_countries = amount_df.nlargest(10, 'total_amount')
 
     # Get ratings for the top 15 countries with the highest total amount
@@ -476,22 +492,28 @@ try:
                     low=top_rating_countries['average_rating'].min(), 
                     high=top_rating_countries['average_rating'].max())
 
+    # Plot the rest of the countries
+    p_top.patches('xs', 'ys', source=world_source_uncolored,
+                fill_color='lightblue', line_color='black', line_width=0.08)
+    
     # Plot world map with color mapper
     world_plot = p_top.patches('xs', 'ys', source=world_source, 
                 fill_color={'field': 'average_rating', 'transform': color_mapper}, 
-                line_color='black', line_width=0.5)
+                line_color='black', line_width=0.08)
     
-    # Plot uncolored countries
-    p_top.patches('xs', 'ys', source=world_source_uncolored,
-                fill_color=None, line_color='black', line_width=0.5)
-    
+    # Add hover tool with tooltips
+    hover = HoverTool(tooltips=[("Country", "@iso_a2")])
+    p_top.add_tools(hover)
+
     # Create legend
     legend_items = []
     for i, (country, row) in enumerate(top_amount_countries.iterrows()):
         total_amount_int = int(row['total_amount'])  # Convert total amount to integer
         avg_rating_one_decimal = round(top_rating_countries.loc[country, 'average_rating'], 1)  # Round average rating to 1 decimal place
-        legend_items.append(LegendItem(label=f"{country} (Total Amount: {total_amount_int}, Avg Rating: {avg_rating_one_decimal})", renderers=[world_plot], index=i))
-    legend = Legend(items=legend_items, location='bottom_left')
+        legend_items.append(LegendItem(label=f"{country} ( EUR : {total_amount_int}, ★: {avg_rating_one_decimal})", renderers=[world_plot], index=i))
+    legend = Legend(items=legend_items, location=(10,10))
+    legend.border_line_color = 'black'  # Set border color
+    legend.border_line_width = 1  # Set border width
     p_top.add_layout(legend)
 
 except Exception as e:
@@ -503,5 +525,5 @@ layout = gridplot([[fig, fig3] ,[plot, p], [p_top]])
 
 # Save the layout to the HTML file
 output_file('index.html')
-show(layout)
+
 save(layout)
