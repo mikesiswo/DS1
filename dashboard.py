@@ -291,7 +291,7 @@ plot.add_layout(legend, 'right')
 
 
 # Display total sales in the middle
-label = Label(x=0, y=0, text=f'EUR {total_sales:,.2f}', text_font_size="14pt", text_baseline="middle", text_align="center")
+label = Label(x=0, y=0, text=f'EUR {total_sales:,.2f}', text_font_size="14pt", text_baseline="middle", text_align="center", text_color='white')
 plot.add_layout(label)
 
 valid_skus = ['unlockcharactermanager', 'premium']
@@ -370,7 +370,7 @@ p.legend.padding = 10  # Adds padding around the legend
 p.legend.margin = 10  # Adds margin around the legend box
 p.legend.label_text_font_size = '10pt'  # Adjust the font size of the legend text
 p.legend.background_fill_alpha = 0.5  # Adds transparency to the legend background
-p.legend.background_fill_color = "white"  # Sets the background color of the legend
+#p.legend.background_fill_color = "white"  # Sets the background color of the legend
 
 # Optionally, if you want to make the legend interactive to hide the slices when clicked, you can do:
 p.legend.click_policy = "hide"
@@ -409,8 +409,8 @@ crashes = merged_data['daily crashes']
 ratings = merged_data['daily average rating']
 
 #Define the second figure
-fig3 = figure(width=400, height=400, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
-              background_fill_color="#fafafa")
+fig3 = figure(title ="Rating based on Crashes",width=400, height=400, x_axis_label='Daily Crashes', y_axis_label='Daily Average Ratings',
+              background_fill_color="#0047AB")
 
 # Remove ticks on the x-axis
 fig3.xaxis.major_tick_line_color = None
@@ -433,6 +433,7 @@ fig3.xgrid.grid_line_color = None
 # change just some things about the y-grid
 fig3.ygrid.band_fill_alpha = 0.3
 fig3.ygrid.band_fill_color = "cyan"
+
 
 # TASK 4 - GEOGRAPHICAL DEVELOPMENT 
 
@@ -536,10 +537,12 @@ except Exception as e:
     print("Error occurred:", e)
     
 from bokeh.layouts import column, row
+from bokeh.io import curdoc
 
 layout = column(row(fig, p, fig3), row(p_top, plot))
 
 # Save the layout to the HTML file
-output_file('index.html')
+output_file('index.html', mode='inline')
+curdoc().theme = 'dark_minimal'
 
 save(layout)
