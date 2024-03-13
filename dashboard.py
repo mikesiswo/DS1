@@ -166,8 +166,6 @@ for file_name, df in preprocessed_dfs.items():
             # Count the number of transactions
             transactions[f"transactions{counter}"] = len(df)
             counter += 1
-    
-months = [6,7,8,9,10,11,12]
 
 Amount_EUR = [amount_sums['amount6'],amount_sums['amount7'],amount_sums['amount8'],
           amount_sums['amount9'],amount_sums['amount10'],amount_sums['amount11'],
@@ -178,24 +176,42 @@ Transactions = [transactions['transactions6'],transactions['transactions7'],
                 transactions['transactions10'],transactions['transactions11'],
                 transactions['transactions12']]
 
+# Define the months as strings
+months = ['June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-# Create a figure with a datetime type x-axis
+# Map month names to their corresponding numerical positions
+month_positions = {'June': 6, 'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12}
+
+# Create a figure with a linear x-axis
 fig = figure(title='Sales Data - Amount(EUR)',
-              height=400, width=700,
-              x_axis_label='Months', y_axis_label='Amount(EUR)',
+              height=400, width=600,
+              #x_axis_label='Months', y_axis_label='Amount(EUR)',
               x_minor_ticks=2, y_range=(0, 1500),
               toolbar_location=None)
 
-fig.vbar(x=months, bottom=0, top=Amount_EUR, 
-          color='blue', width=0.25,legend_label='Amount')
+# Plot the data using numerical positions on the x-axis
+fig.vbar(x=[month_positions[month] for month in months], bottom=0, top=Amount_EUR, 
+          color='blue', width=0.25, legend_label='Amount (EUR)')
 
-fig.line(x=months, y=Transactions, 
+fig.line(x=[month_positions[month] for month in months], y=Transactions, 
           color='red', line_width=1, legend_label='Transactions')
+# Add circles at the data points where the line pivots
+fig.circle(x=[month_positions[month] for month in months], y=Transactions, 
+           size=7, color='red', fill_alpha=0.8)
 
+# Set x-axis ticker to display month names
+fig.xaxis.ticker = [month_positions[month] for month in months]
+fig.xaxis.major_label_overrides = {month_positions[month]: month for month in months}
+# Remove ticks on the x-axis
+fig.xaxis.major_tick_line_color = None
+fig.xaxis.minor_tick_line_color = None
+# Remove ticks on the y-axis
+fig.yaxis.major_tick_line_color = None
+fig.yaxis.minor_tick_line_color = None
 
-# # Put the legend in the upper left corner
+# Put the legend in the upper right corner
 fig.legend.location = 'top_right'
-fig.legend.border_line_color ='black'
+fig.legend.border_line_color = 'black'
 fig.legend.border_line_width = 1
 
 # TASK 2 - ATTRIBUTE SEGMENTATION AND FILTERING
@@ -247,7 +263,7 @@ df_combined['Angle'] = df_combined['Sales'] / total_sales * 2 * pi
 # Plot setup
 xdr = Range1d(start=-2, end=2)
 ydr = Range1d(start=-2, end=2)
-plot = Plot(x_range=xdr, y_range=ydr, title="Sales by Country (Top 9 + Other)", toolbar_location=None, width=800, height=600)
+plot = Plot(x_range=xdr, y_range=ydr, title="Sales by Country (Top 9 + Other)", toolbar_location=None, width=600, height=600)
 
 angles = df_combined['Angle'].cumsum().tolist()
 country_source = ColumnDataSource(dict(
@@ -326,8 +342,8 @@ sku_sales_volume['angle'] = sku_sales_volume['SalesVolume'] / total_sales * 2 * 
 
 # Manually assign colors to the SKUs
 sku_color_map = {
-    'unlockcharactermanager': 'blue',  # Example color
-    'premium': 'red'  # Example color
+    'unlockcharactermanager': 'blue',  
+    'premium': 'red'  
 }
 sku_sales_volume['color'] = sku_sales_volume['SKU'].map(sku_color_map)
 
@@ -335,7 +351,7 @@ sku_sales_volume['color'] = sku_sales_volume['SKU'].map(sku_color_map)
 source = ColumnDataSource(sku_sales_volume)
 
 # Create figure
-p = figure(height=500, title="Sales Volume by SKU", toolbar_location=None,
+p = figure(height=400, width= 400, title="Sales Volume by SKU", toolbar_location=None,
            tools="", tooltips=None, x_range=(-0.5, 1.0))
 
 # Adjust here for donut plot - Add annular wedges instead of wedges
@@ -464,7 +480,7 @@ try:
     world = gpd.read_file(world_shapefile_path)
 
     # Create a figure
-    p_top = figure(title='Top 10 Countries by Total Amount and Average Rating', tools="pan,wheel_zoom,box_zoom,reset,save", width=1000, height=600,x_axis_location=None, y_axis_location=None)
+    p_top = figure(title='Top 10 Countries by Total Amount and Average Rating', tools="pan,wheel_zoom,box_zoom,reset,save", width=800, height=600,x_axis_location=None, y_axis_location=None)
     # Add a border around the figure
     p_top.outline_line_color = 'black'
     p_top.outline_line_width = 1
@@ -519,9 +535,9 @@ try:
 except Exception as e:
     print("Error occurred:", e)
     
+from bokeh.layouts import column, row
 
-# Create a layout grid with both figures and their legends
-layout = gridplot([[fig, fig3] ,[plot, p], [p_top]])
+layout = column(row(fig, p, fig3), row(p_top, plot))
 
 # Save the layout to the HTML file
 output_file('index.html')
