@@ -209,6 +209,14 @@ fig.xaxis.minor_tick_line_color = None
 fig.yaxis.major_tick_line_color = None
 fig.yaxis.minor_tick_line_color = None
 
+# Define the hover tooltips for the bars and circles
+hover_bar = HoverTool(renderers=[fig.renderers[0]], tooltips=[("Amount", "@top")], mode='vline')
+hover_circle = HoverTool(renderers=[fig.renderers[-1]], tooltips=[("Transactions", "@y")], mode='mouse')
+
+# Add the hover tools to the figure
+fig.add_tools(hover_bar)
+fig.add_tools(hover_circle)
+
 # Put the legend in the upper right corner
 fig.legend.location = 'top_right'
 fig.legend.border_line_color = 'black'
@@ -271,6 +279,7 @@ country_source = ColumnDataSource(dict(
     end=angles,
     color=Category10[10][:len(df_combined)],  # Ensure this matches with 'fill_color' in the glyph
     country=df_combined['Country'],
+    salesc =df_combined['Sales'].astype(int)
 ))
 
 glyph = AnnularWedge(x=0, y=0, inner_radius=0.8, outer_radius=1.5,
@@ -278,6 +287,11 @@ glyph = AnnularWedge(x=0, y=0, inner_radius=0.8, outer_radius=1.5,
                      fill_color='color', line_color="white", line_width=3)
 plot.add_glyph(country_source, glyph)
 
+# Define the HoverTool with tooltips
+hover = HoverTool(tooltips=[("Country", "@country"), ("Sales", "@salesc")])
+
+# Add the HoverTool to the plot
+plot.add_tools(hover)
 
 # Create the glyph and add it to the plot, capturing the renderer
 renderer = plot.add_glyph(country_source, glyph)
@@ -347,6 +361,9 @@ sku_color_map = {
 }
 sku_sales_volume['color'] = sku_sales_volume['SKU'].map(sku_color_map)
 
+# Convert sales volume to integers
+sku_sales_volume['SalesVolume'] = sku_sales_volume['SalesVolume'].astype(int)
+
 # Create a ColumnDataSource for the main chart
 source = ColumnDataSource(sku_sales_volume)
 
@@ -371,6 +388,9 @@ p.legend.margin = 10  # Adds margin around the legend box
 p.legend.label_text_font_size = '10pt'  # Adjust the font size of the legend text
 p.legend.background_fill_alpha = 0.5  # Adds transparency to the legend background
 #p.legend.background_fill_color = "white"  # Sets the background color of the legend
+
+hover = HoverTool(tooltips=[("SKU", "@SKU"), ("Sales Volume", "@SalesVolume")])
+p.add_tools(hover)
 
 # Optionally, if you want to make the legend interactive to hide the slices when clicked, you can do:
 p.legend.click_policy = "hide"
